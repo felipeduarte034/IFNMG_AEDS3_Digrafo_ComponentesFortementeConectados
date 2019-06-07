@@ -6,8 +6,6 @@
 #define BRANCO 0
 #define CINZA 1
 #define PRETO 2
-#define RED 2
-#define BLUE 1
 
 /**
  * BRANCO - nodo ainda não encontrado
@@ -27,6 +25,10 @@ public:
 	vector<vector<int>> adj; //lista de adjacentes
 	vector<vector<int>> adj_inv; //lista de adjacentes invertida
 
+	vector<int> ini; //lista de tempos de inicio
+	vector<int> fim; //lista de tempos de termino
+	vector<int> container; //lista nodos
+
 	//nodo [0] --> [1] [4]
 	//nodo [1] --> [0] [5]
 
@@ -37,6 +39,8 @@ public:
 		{
 			adj.push_back(vector<int>());
 			adj_inv.push_back(vector<int>());
+			ini.push_back(-1);
+			fim.push_back(-1);
 		}
 	}
 	void criarAresta(int x, int y)
@@ -49,13 +53,42 @@ public:
 		int counter=0;
 		for(vector<int> v : adj)
 		{
-			cout << counter++ << ": ";
+			cout << counter++ << "--> ";
 			for(int x : v)
 			{
 				cout << x << ", ";
 			}
 			cout << endl;
 		}
+	}
+	void printTimer()
+	{
+		for(int t=0; t<ini.size(); t++)
+		{
+			cout << t << ": [" << ini[t] << "/" << fim[t] << "]" << endl;
+		}
+	}
+	void printContainer()
+	{
+		cout << "container: ";
+		for(int c : container)
+		{
+			cout << c << ",";
+		}
+		cout<<endl;
+	}
+	void printEndTime()
+	{
+		cout << "tempo de fim: ";
+		/*for(int c : container)
+		{
+			cout << "[n:" << c << ",et:"<<fim[c]<<"] - ";
+		}*/
+		for(int c : container)
+		{
+			cout <<fim[c]<<",";
+		}
+		cout<<endl;
 	}
 };
 class Info
@@ -84,77 +117,69 @@ bool removeByValue(int value, vector<int> &v)
 
 //------------------------------------------------------------------------------
 
-void DFS_rec(Grafo *g, int v, vector<int> &cor, vector<int> &fim, int*time)
+void DFS(Grafo *g, int v, vector<int> &cor, int *timer)
 {
-	vector<int> ini(g->n,-1);
-	*time = (*time)+1;
-	ini[v] = *time;
-	cor[v] = CINZA;
-	for(int i=0; i < g->adj[v].size(); ++i)
+	*timer=(*timer)+1;
+	g->ini[v]=(*timer);
+	cor[v]=CINZA;
+	for(int i=0; i<g->adj[v].size(); ++i)
 	{
 		int w = g->adj[v][i];
 		if(cor[w]==BRANCO)
-		{
-			DFS_rec(g,w,cor,fim,time);
-		}
+			DFS(g,w,cor,timer);
 	}
-	*time = (*time)+1;
-	fim[v] = *time;
+	*timer=(*timer)+1;
+	g->fim[v]=(*timer);
+	g->container.push_back(v); //armazenar em um container, fila ou pilha
 }
 
-void DFS(Grafo *g, vector<int> &fim, int*time) //percorre todos os VERTICES do grafo
+void DFS(Grafo *g)
 {
-	vector<int> cor(g->n, BRANCO);
-	for(int v=0; v<g->n; ++v)
+	vector<int> cor(g->n,0);
+	int t=0;
+	int *timer=&t;
+	for(int v=0; v<g->n; ++v) //percorre todos os vertices do grafo
 	{
 		if(cor[v]==BRANCO)
-			DFS_rec(g,v,cor,fim,time);
+			DFS(g,v,cor,timer);
 	}
 }
 
-void DFS2(Grafo *g, int v, vector<int> &cor)
+
+void DFS_inv(Grafo *g, int v, vector<int> &cor)
 {
+	cout << v << " ";
+	//*timer=(*timer)+1;
+	//g->ini[v]=(*timer);
 	cor[v]=CINZA;
 	for(int i=0; i<g->adj_inv[v].size(); ++i)
 	{
-		int w = g->adj[v][i];
+		int w = g->adj_inv[v][i];
 		if(cor[w]==BRANCO)
 		{
-			cout << w << ", ";
-			DFS2(g,w,cor);
-		}
+			DFS_inv(g,w,cor);
+		}	
 	}
-	cor[v]=2;
+	//*timer=(*timer)+1;
+	//g->fim[v]=(*timer);
+	//g->container.push_back(v); //armazenar em um container, fila ou pilha
 }
-
-int countCFC(Grafo *g)
+void DFS_inv(Grafo *g)
 {
-	int t=0;
-	int*time=&t;
-	vector<int> fim(g->n,-1);
-	DFS(g,fim,time);
-
-	//vector<int> vert_ord = ordena_term(fim, fim.size());
-	sort(fim.begin(),fim.end());
-	vector<int> cor(g->n, BRANCO);
-	//cor.clear();
-	//cor.resize(g->n,0);
-
-	*time=0;
-	int ncomp = 0;
-	for(int i=0; i<g->n; ++i)//percorre todos os VERTICES do grafo
+	vector<int> cor(g->n,0);
+	int t=g->container.size()-1;
+	
+	for(int v=t; v>=0; v--) //percorre todos os vertices do grafo - seguindo o container
 	{
-		//int v = vert_ord[i];
-		int v = fim[i];
-		if(cor[v]==BRANCO)
+		if(cor[g->container[v]]==BRANCO)
 		{
-			cout << "componentes: ";
-			DFS2(g,v,cor); //grafo invertido
-			ncomp++;
+			DFS_inv(g,g->container[v],cor);
+			cout << endl;
 		}
 	}
-	return ncomp;
 }
+
+//------------------------------------------------------------------------------
 
 Info *DecodificaInstrucao(string line)
 {
@@ -194,12 +219,22 @@ int main(int argc, char const *argv[])
 			break;
 	}
 
-	//cout << (isConexo(g,0) ? "Conexo" : "Desconexo") << endl;
+	//int k = countCFC(g); 
+	//cout << "k: " << k << " " << endl;
 
-	int k = countCFC(g); 
-	cout << "k: " << k << " " << endl;
+	DFS(g);
 
-	//g->printAdj();
+	cout << "Componentes Fortemente Conexas:"<<endl;
+	DFS_inv(g);
+
+	/*cout<<"--------------------------"<<endl;
+	g->printAdj();
+	cout<<"--------------------------"<<endl;
+	g->printTimer();
+	cout<<"--------------------------"<<endl;
+	g->printContainer();
+	cout<<"--------------------------"<<endl;
+	g->printEndTime();*/
 
 	return 0;
 }
